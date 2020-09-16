@@ -2,17 +2,32 @@
 
 '''
 import pandas as pd
-import numpy as np
+import torch
 from torch_geometric.data import Data
 
-TRAIN_DATA_PATH = './data/train.json'
-TEST_DATA_PATH = './data/test.json'
-
+'''Encode the nucleotide as one-hot vector'''
 RNA_ONEHOT = {'G' : [1,0,0,0], 'C' : [0,1,0,0], 'A' : [0,0,1,0], 'U' : [0,0,0,1]}
+
+'''Encode pair contact as one-hot vector. Put the atypical contact types in single category'''
 BOND_ONEHOT = {('A','U') : [0,1,0,0], ('C','G') : [0,0,1,0], 'atypical' : [0,0,0,1], 'covalent' : [1,0,0,0]}
+
+'''Names for the properties to predict'''
+Y_NAMES = ['reactivity', 'deg_Mg_pH10', 'deg_pH10', 'deg_Mg_50C', 'deg_50C']
+
+'''Root of file name to save graph data in'''
+GRAPH_NAME = 'graph_pytorch'
 
 def create_node_features(seq):
     return [RNA_ONEHOT[letter] for letter in seq]
+
+def create_node_y_features(df):
+
+    ret = []
+    df_new = pd.DataFrame([df.loc[label] for label in Y_NAMES], index=Y_NAMES)
+    for column in df_new:
+        ret.append(df_new[column].to_list())
+
+    return ret
 
 def create_graph_matrix(structure, seq):
 
@@ -55,28 +70,46 @@ def create_graph_matrix(structure, seq):
         node_nonb2.append(node_id + 1)
         edge_property.append(BOND_ONEHOT['covalent'])
 
+    node_nonb1.pop(-1)
     node_nonb2.pop(-1)
     edge_property.pop(-1)
 
     return node_nonb1, node_nonb2, edge_property
 
-def create_inp_graphs(f_train, f_test):
+def graph_props_x_(df):
 
-    train = pd.read_json(f_train, lines=True)
-    test = pd.read_json(f_test, lines=True)
-
-    for row_id, row in train.iterrows():
-        print (row)
-        print (row.sequence)
-        node_features = create_node_features(row.sequence)
-        print (node_features)
+    for row_id, row in df.iterrows():
+        node_features_x = create_node_features(row.sequence)
         e_index_1, e_index_2, edge_prop = create_graph_matrix(row.structure, row.sequence)
-        print (e_index_1)
-        print (e_index_2)
-        print (edge_prop)
-        raise RuntimeError
-    print (train)
-    print (train.columns)
+
+        if Y_NAMES[0] in row.index:
+            node_features_y = create_node_y_features(row.loc[Y_NAMES])
+
+        else:
+            node_features_y = None
+
+        yield node_features_x, node_features_y, e_index_1, e_index_2, edge_prop
+
+def create_inp_graphs(f_in, f_out_dir):
+
+    df = pd.read_json(f_in, lines=True)
+
+    counter = 0
+    for node_props_x, node_props_y, e_index_1, e_index_2, edge_props in graph_props_x_(df):
+        edge_index = torch.tensor([e_index_1, e_index_2], dtype=torch.long)
+        x = torch.tensor(node_props_x, dtype=torch.long)
+        edge_x = torch.tensor(edge_props)
+
+        if not node_props_y is None:
+            y = torch.tensor(node_props_y, dtype=torch.float64)
+        else:
+            y = None
+
+        data = Data(x=x, edge_index=edge_index, y=y, edge_attr=edge_x)
+        torch.save(data, '{}/{}_{}.pt'.format(f_out_dir, GRAPH_NAME, counter))
+
+        counter += 1
 
 if __name__ == '__main__':
-    create_inp_graphs(TRAIN_DATA_PATH, TEST_DATA_PATH)
+    create_inp_graphs('./data/train.json', './data_processed_train')
+    create_inp_graphs('./data/test.json', './data_processed_test')
