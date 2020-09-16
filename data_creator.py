@@ -97,11 +97,11 @@ def create_inp_graphs(f_in, f_out_dir):
     counter = 0
     for node_props_x, node_props_y, e_index_1, e_index_2, edge_props in graph_props_x_(df):
         edge_index = torch.tensor([e_index_1, e_index_2], dtype=torch.long)
-        x = torch.tensor(node_props_x, dtype=torch.long)
-        edge_x = torch.tensor(edge_props)
+        x = torch.tensor(node_props_x, dtype=torch.float)
+        edge_x = torch.tensor(edge_props, dtype=torch.float)
 
         if not node_props_y is None:
-            y = torch.tensor(node_props_y, dtype=torch.float64)
+            y = torch.tensor(node_props_y, dtype=torch.float)
         else:
             y = None
 
