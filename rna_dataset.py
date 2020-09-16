@@ -20,6 +20,16 @@ class RNADataset(Dataset):
     def len(self):
         return len([file_name for file_name in listdir(self.root_dir) if '.pt' in file_name])
 
+    def _load(self, idx):
+        return torch.load('{}/{}_{}.pt'.format(self.root_dir, GRAPH_NAME, idx))
+
     def get(self, idx):
-        data = torch.load('{}/{}_{}.pt'.format(self.root_dir, GRAPH_NAME, idx))
-        return data
+        return self._load(idx)
+
+    @property
+    def n_seq_score(self, idx):
+        return self._load(idx).n_seq_score
+
+    @property
+    def n_seq_total(self, idx):
+        return self._load(idx).n_seq_total

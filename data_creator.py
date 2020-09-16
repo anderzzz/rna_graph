@@ -88,14 +88,14 @@ def graph_props_x_(df):
         else:
             node_features_y = None
 
-        yield node_features_x, node_features_y, e_index_1, e_index_2, edge_prop
+        yield node_features_x, node_features_y, e_index_1, e_index_2, edge_prop, row['seq_scored']
 
 def create_inp_graphs(f_in, f_out_dir):
 
     df = pd.read_json(f_in, lines=True)
 
     counter = 0
-    for node_props_x, node_props_y, e_index_1, e_index_2, edge_props in graph_props_x_(df):
+    for node_props_x, node_props_y, e_index_1, e_index_2, edge_props, n_scored in graph_props_x_(df):
         edge_index = torch.tensor([e_index_1, e_index_2], dtype=torch.long)
         x = torch.tensor(node_props_x, dtype=torch.float)
         edge_x = torch.tensor(edge_props, dtype=torch.float)
@@ -105,7 +105,8 @@ def create_inp_graphs(f_in, f_out_dir):
         else:
             y = None
 
-        data = Data(x=x, edge_index=edge_index, y=y, edge_attr=edge_x)
+        data = Data(x=x, edge_index=edge_index, y=y, edge_attr=edge_x,
+                    n_seq_score=n_scored, n_seq_total=x.shape[0])
         torch.save(data, '{}/{}_{}.pt'.format(f_out_dir, GRAPH_NAME, counter))
 
         counter += 1
