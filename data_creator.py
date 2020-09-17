@@ -4,6 +4,7 @@
 import pandas as pd
 import torch
 from torch_geometric.data import Data
+from torch_geometric.utils import is_undirected
 
 '''Encode the nucleotide as one-hot vector'''
 RNA_ONEHOT = {'G' : [1,0,0,0], 'C' : [0,1,0,0], 'A' : [0,0,1,0], 'U' : [0,0,0,1]}
@@ -74,7 +75,12 @@ def create_graph_matrix(structure, seq):
     node_nonb2.pop(-1)
     edge_property.pop(-1)
 
-    return node_nonb1, node_nonb2, edge_property
+    # Make the graph undirected. Since no self-loops exists, this is done by simple transpose
+    node_nonb1_ret = node_nonb1 + node_nonb2
+    node_nonb2_ret = node_nonb2 + node_nonb1
+    edge_property_ret = edge_property + edge_property
+
+    return node_nonb1_ret, node_nonb2_ret, edge_property_ret
 
 def graph_props_x_(df):
 
@@ -88,6 +94,9 @@ def graph_props_x_(df):
         else:
             node_features_y = None
 
+        #print (row['deg_Mg_pH10'])
+        #print (','.join(row['reactivity']))
+
         yield node_features_x, node_features_y, e_index_1, e_index_2, edge_prop, row['seq_scored']
 
 def create_inp_graphs(f_in, f_out_dir):
@@ -97,6 +106,9 @@ def create_inp_graphs(f_in, f_out_dir):
     counter = 0
     for node_props_x, node_props_y, e_index_1, e_index_2, edge_props, n_scored in graph_props_x_(df):
         edge_index = torch.tensor([e_index_1, e_index_2], dtype=torch.long)
+        if not is_undirected(edge_index):
+            raise RuntimeError('Directed graph created, should be impossible')
+
         x = torch.tensor(node_props_x, dtype=torch.float)
         edge_x = torch.tensor(edge_props, dtype=torch.float)
 
