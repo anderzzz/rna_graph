@@ -12,14 +12,18 @@ RNA_ONEHOT = {'G' : [1,0,0,0], 'C' : [0,1,0,0], 'A' : [0,0,1,0], 'U' : [0,0,0,1]
 '''Encode pair contact as one-hot vector. Put the atypical contact types in single category'''
 BOND_ONEHOT = {('A','U') : [0,1,0,0], ('C','G') : [0,0,1,0], 'atypical' : [0,0,0,1], 'covalent' : [1,0,0,0]}
 
+'''Encode loop type as one-hot vector.'''
+LOOP_ONEHOT = {'E' : [1,0,0,0,0,0,0], 'S' : [0,1,0,0,0,0,0], 'H' : [0,0,1,0,0,0,0], 'B' : [0,0,0,1,0,0,0],
+               'X' : [0,0,0,0,1,0,0], 'I' : [0,0,0,0,0,1,0], 'M' : [0,0,0,0,0,0,1]}
+
 '''Names for the properties to predict'''
 Y_NAMES = ['reactivity', 'deg_Mg_pH10', 'deg_pH10', 'deg_Mg_50C', 'deg_50C']
 
 '''Root of file name to save graph data in'''
 GRAPH_NAME = 'graph_pytorch'
 
-def create_node_features(seq):
-    return [RNA_ONEHOT[letter] for letter in seq]
+def create_node_features(seq, loop):
+    return [RNA_ONEHOT[letter_nuc] + LOOP_ONEHOT[letter_loop] for letter_nuc, letter_loop in zip(seq, loop)]
 
 def create_node_y_features(df):
 
@@ -85,7 +89,7 @@ def create_graph_matrix(structure, seq):
 def graph_props_x_(df):
 
     for row_id, row in df.iterrows():
-        node_features_x = create_node_features(row.sequence)
+        node_features_x = create_node_features(row.sequence, row.predicted_loop_type)
         e_index_1, e_index_2, edge_prop = create_graph_matrix(row.structure, row.sequence)
 
         if Y_NAMES[0] in row.index:
@@ -94,17 +98,20 @@ def graph_props_x_(df):
         else:
             node_features_y = None
 
-        #print (row['deg_Mg_pH10'])
-        #print (','.join(row['reactivity']))
+        if 'signal_to_noise' in row.index:
+            sn_val = row['signal_to_noise']
 
-        yield node_features_x, node_features_y, e_index_1, e_index_2, edge_prop, row['seq_scored']
+        else:
+            sn_val = None
+
+        yield node_features_x, node_features_y, e_index_1, e_index_2, edge_prop, row['seq_scored'], sn_val
 
 def create_inp_graphs(f_in, f_out_dir):
 
     df = pd.read_json(f_in, lines=True)
 
     counter = 0
-    for node_props_x, node_props_y, e_index_1, e_index_2, edge_props, n_scored in graph_props_x_(df):
+    for node_props_x, node_props_y, e_index_1, e_index_2, edge_props, n_scored, sn_val in graph_props_x_(df):
         edge_index = torch.tensor([e_index_1, e_index_2], dtype=torch.long)
         if not is_undirected(edge_index):
             raise RuntimeError('Directed graph created, should be impossible')
@@ -117,8 +124,10 @@ def create_inp_graphs(f_in, f_out_dir):
         else:
             y = None
 
+        train_mask = torch.zeros(x.shape[0], dtype=torch.bool)
+        train_mask[:n_scored] = True
         data = Data(x=x, edge_index=edge_index, y=y, edge_attr=edge_x,
-                    n_seq_score=n_scored, n_seq_total=x.shape[0])
+                    train_mask=train_mask, sn_val=sn_val)
         torch.save(data, '{}/{}_{}.pt'.format(f_out_dir, GRAPH_NAME, counter))
 
         counter += 1
