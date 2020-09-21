@@ -5,6 +5,7 @@ import torch
 from torch.nn.utils import weight_norm
 import torch.nn.functional as F
 from torch_geometric.nn import GCNConv, GMMConv, ChebConv, SGConv, GENConv, DeepGCNLayer
+from torch.nn import Conv1d, ReLU, Linear
 
 from torch_geometric.data import Data
 
@@ -23,6 +24,8 @@ class LatentGraph(torch.nn.Module):
                  conv_kwargs={}):
 
         super(LatentGraph, self).__init__()
+
+        raise NotImplementedError('This graph convolutional network not properly implemented')
 
         self.n_in_edge_props = n_in_edge_props
         self.n_in_node_props = n_in_node_props
@@ -140,3 +143,43 @@ class DeeperGCN(torch.nn.Module):
         x_pred = self.lin_out(x)
 
         return x_pred
+
+class _DenseConvBlock(torch.nn.Module):
+    '''Bla bla
+
+    '''
+    def __init__(self, in_channels, out_channels, kernel_size):
+        super(_DenseConvBlock, self).__init__()
+        self.conv1d = Conv1d(in_channels=in_channels, out_channels=out_channels, kernel_size=kernel_size)
+
+    def forward(self, x):
+        print (x)
+        out = self.conv1d(x)
+        print (out.shape)
+        raise RuntimeError
+        return out
+
+class DenseDeep1D(torch.nn.Module):
+    '''Bla bla
+
+    '''
+    def __init__(self, in_channels, out_channels, n_blocks):
+        super(DenseDeep1D, self).__init__()
+
+        self.n_blocks = n_blocks
+        self.features = torch.nn.Sequential()
+        for k_block in range(n_blocks):
+            self.features.add_module('block_{}'.format(k_block), _DenseConvBlock(in_channels, out_channels, 3))
+
+    def forward(self, x):
+        xx = self.features(x)
+
+
+def test1():
+
+    mm = DenseDeep1D(6, 2, 1)
+    dd = torch.load('graphs_pytorch_0.pt')
+    print (dd.x)
+    mm(dd.x)
+
+#test1()

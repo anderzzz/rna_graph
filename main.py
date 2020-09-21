@@ -1,4 +1,4 @@
-'''Main
+'''Main for Graph training
 
 '''
 import copy
@@ -10,39 +10,15 @@ from torch_geometric.data import DataLoader
 import numpy as np
 from numpy.random import shuffle
 
-from rna_dataset import RNADataset
-from model import DeeperGCN
-from model_dummy import MPNNet
-from data_creator import RNA_ONEHOT, BOND_ONEHOT, LOOP_ONEHOT
+from rna_dataset_graph import RNADatasetGraph
+from rawdata import RNA_ONEHOT, BOND_ONEHOT, LOOP_ONEHOT
+from loss import MCRMSELoss
 
 def seed_all(seed=42):
     np.random.seed(seed)
     torch.manual_seed(seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
-
-class RMSELoss(torch.nn.Module):
-    def __init__(self, eps=1e-6):
-        super().__init__()
-        self.mse = torch.nn.MSELoss()
-        self.eps = eps
-
-    def forward(self, yhat, y):
-        loss = torch.sqrt(self.mse(yhat, y) + self.eps)
-        return loss
-
-class MCRMSELoss(torch.nn.Module):
-    def __init__(self, num_scored=3):
-        super().__init__()
-        self.rmse = RMSELoss()
-        self.num_scored = num_scored
-
-    def forward(self, yhat, y):
-        score = 0
-        for i in range(self.num_scored):
-            score += self.rmse(yhat[:, i], y[:, i]) / self.num_scored
-
-        return score
 
 def trainer(model, dataloaders,
             n_epochs, lr_init, scheduler_step_size, scheduler_gamma,
@@ -117,7 +93,7 @@ if __name__ == '__main__':
     torch.manual_seed(1794)
 
     # Define the dataset and dataloader
-    rna_structure_data = RNADataset(run_data_inp, filter_noise=True)
+    rna_structure_data = RNADatasetGraph(run_data_inp, filter_noise=True)
     all_inds = list(range(len(rna_structure_data)))
     shuffle(all_inds)
     test_inds = all_inds[:int(run_frac_test * len(rna_structure_data))]
@@ -126,14 +102,13 @@ if __name__ == '__main__':
                             'test' : DataLoader(Subset(rna_structure_data, test_inds), batch_size=run_batch_size, shuffle=False)}
 
     # Define the model
+    n_out_node = rna_structure_data.n_pred_dim
     n_in_edge = len(list(BOND_ONEHOT.values())[0])
     n_in_node = len(list(RNA_ONEHOT.values())[0]) + len(list(LOOP_ONEHOT.values())[0])
-    n_out_node = rna_structure_data.n_pred_dim
     model = DeeperGCN(n_in_edge_props=n_in_edge, n_in_node_props=n_in_node,
                       n_out_node_props=n_out_node,
                       n_hidden_channels=run_n_hidden_channels,
                       num_layers=run_n_conv_layers)
-#    model = MPNNet(n_in_node,128,n_out_node,10,n_in_edge)
 
     # Define the trainer
     trainer(model, rna_structure_loaders,
