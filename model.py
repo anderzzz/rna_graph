@@ -150,29 +150,30 @@ class _DenseConvBlock(torch.nn.Module):
     '''
     def __init__(self, in_channels, out_channels, kernel_size):
         super(_DenseConvBlock, self).__init__()
-        self.conv1d = Conv1d(in_channels=in_channels, out_channels=out_channels, kernel_size=kernel_size)
+        self.conv1d = Conv1d(in_channels=in_channels, out_channels=out_channels,
+                             groups=1, kernel_size=kernel_size, padding_mode='reflect', padding=1)
 
     def forward(self, x):
-        print (x)
-        out = self.conv1d(x)
+        out = self.conv1d(x.permute(0,2,1)).permute(0,2,1)
         print (out.shape)
-        raise RuntimeError
         return out
 
 class DenseDeep1D(torch.nn.Module):
     '''Bla bla
 
     '''
-    def __init__(self, in_channels, out_channels, n_blocks):
+    def __init__(self, n_in_channels, n_out_channels, n_blocks, n_hidden_channels):
         super(DenseDeep1D, self).__init__()
 
         self.n_blocks = n_blocks
+        self.n_hidden_channels = n_hidden_channels
         self.features = torch.nn.Sequential()
         for k_block in range(n_blocks):
-            self.features.add_module('block_{}'.format(k_block), _DenseConvBlock(in_channels, out_channels, 3))
+            self.features.add_module('block_{}'.format(k_block), _DenseConvBlock(n_in_channels, n_hidden_channels, 3))
 
     def forward(self, x):
         xx = self.features(x)
+        raise RuntimeError
 
 
 def test1():

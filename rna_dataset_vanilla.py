@@ -28,7 +28,12 @@ class RNADataset(Dataset):
 
         if create_data:
             self._create_data()
+            with open('toc.csv', 'w') as fout:
+                print ('total_processed, {}'.format(self.total_processed), file=fout)
         else:
+            with open('toc.csv', 'r') as fin:
+                self.total_processed = int(fin.readline().split(',')[1])
+                print (self.total_processed)
             print ('Data no created, only loaded. Noise filter and node feature configurations implied.')
 
         super(RNADataset, self).__init__()
@@ -70,7 +75,7 @@ class RNADataset(Dataset):
             train_mask = torch.zeros(x.shape[0], dtype=torch.bool)
             train_mask[:n_scored] = True
 
-            torch.save({'x' : x, 'train_mask' : train_mask, 'sn_filter' : sn_filter},
+            torch.save({'x' : x, 'y' : y, 'train_mask' : train_mask, 'sn_filter' : sn_filter},
                        '{}/{}_{}.pt'.format(self.save_dir, ALL_DATA_NAME, counter))
             counter += 1
 
@@ -84,7 +89,12 @@ class RNADataset(Dataset):
 
     @property
     def n_pred_dim(self):
-        return self.__getitem__(0).y.shape[-1]
+        return self.__getitem__(0)['y'].shape[-1]
+
+    @property
+    def n_node_dim(self):
+        return self.__getitem__(0)['x'].shape[-1]
+
 
 def test1():
     rna_data = RNADataset('./data/train.json', './tmp_out', True, True, True)
@@ -110,4 +120,3 @@ def test2():
     print (rna_data2[0])
     print (rna_data2[0]['x'].shape)
 
-test2()

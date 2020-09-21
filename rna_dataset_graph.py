@@ -93,6 +93,15 @@ class RNADatasetGraph(Dataset):
     def n_pred_dim(self):
         return self.get(0).y.shape[-1]
 
+    @property
+    def n_node_dim(self):
+        return self.get(0).x.shape[-1]
+
+    @property
+    def n_edge_dim(self):
+        return self.get(0).edge_attr.shape[-1]
+
+
 def test1():
     rna_data = RNADatasetGraph('./data/train.json', './tmp_out', True, True, True)
     print (rna_data)
@@ -105,4 +114,3 @@ def test1():
     print (rna_data.get_raw_data(5).structure)
     print (rna_data.get_raw_data(5).sequence)
 
-test1()
