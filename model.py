@@ -1,11 +1,13 @@
 '''Bla bla for now
 
 '''
+from collections import OrderedDict
+
 import torch
 from torch.nn.utils import weight_norm
 import torch.nn.functional as F
 from torch_geometric.nn import GCNConv, GMMConv, ChebConv, SGConv, GENConv, DeepGCNLayer
-from torch.nn import Conv1d, ReLU, Linear
+from torch.nn import Conv1d, ReLU, Linear, BatchNorm1d, LayerNorm
 
 from torch_geometric.data import Data
 
@@ -148,32 +150,59 @@ class _DenseConvBlock(torch.nn.Module):
     '''Bla bla
 
     '''
-    def __init__(self, in_channels, out_channels, kernel_size):
+    def __init__(self, n_inp_features, growth_rate, drop_rate, kernel_size):
         super(_DenseConvBlock, self).__init__()
-        self.conv1d = Conv1d(in_channels=in_channels, out_channels=out_channels,
-                             groups=1, kernel_size=kernel_size, padding_mode='reflect', padding=1)
+
+        self.drop_rate = drop_rate
+        self.conv1d = Conv1d(in_channels=n_inp_features,
+                             out_channels=growth_rate,
+                             groups=1, kernel_size=kernel_size, padding_mode='reflect', padding=kernel_size - 2)
+        self.act = ReLU(inplace=True)
+        #self.norm = BatchNorm1d(growth_rate)
+        self.norm = LayerNorm([growth_rate, 107])
 
     def forward(self, x):
-        out = self.conv1d(x.permute(0,2,1)).permute(0,2,1)
-        print (out.shape)
-        return out
+        out = self.conv1d(x)
+        out = self.act(out)
+        out = self.norm(out)
+        if self.drop_rate > 0:
+            out = F.dropout(out, p=self.drop_rate, training=self.training)
+        ret = torch.cat([x, out], dim=1)
+        return ret
 
 class DenseDeep1D(torch.nn.Module):
     '''Bla bla
 
     '''
-    def __init__(self, n_in_channels, n_out_channels, n_blocks, n_hidden_channels):
+    def __init__(self, n_in_channels, n_out_channels, n_blocks, n_init_features, growth_rate, drop_rate, kernel_sizes):
         super(DenseDeep1D, self).__init__()
 
         self.n_blocks = n_blocks
-        self.n_hidden_channels = n_hidden_channels
-        self.features = torch.nn.Sequential()
+
+        self.features = torch.nn.Sequential(OrderedDict([
+            ('conv0', Conv1d(n_in_channels, n_init_features, kernel_size=kernel_sizes['conv0'],
+                             padding_mode='reflect', padding=kernel_sizes['conv0'] - 2)),
+#            ('norm0', BatchNorm1d(n_init_features)),
+            ('norm0', LayerNorm([n_init_features, 107])),
+            ('relu0', ReLU(inplace=True))
+        ]))
+
         for k_block in range(n_blocks):
-            self.features.add_module('block_{}'.format(k_block), _DenseConvBlock(n_in_channels, n_hidden_channels, 3))
+            self.features.add_module('block_{}'.format(k_block),
+                                     _DenseConvBlock(n_init_features + k_block * growth_rate,
+                                                     growth_rate=growth_rate,
+                                                     drop_rate=drop_rate,
+                                                     kernel_size=kernel_sizes['blocks']))
+
+        self.act_final = ReLU(inplace=True)
+        self.regression = Linear(n_init_features + n_blocks * growth_rate, n_out_channels)
 
     def forward(self, x):
-        xx = self.features(x)
-        raise RuntimeError
+        x_perm = x.permute(0,2,1)
+        x1 = self.features(x_perm)
+        x2 = self.act_final(x1)
+        out = self.regression(x2.permute(0,2,1))
+        return out
 
 
 def test1():

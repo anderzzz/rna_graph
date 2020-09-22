@@ -55,7 +55,8 @@ def trainer_vanilla(model, dataloaders,
                 out = model(data_x)
 
                 y_to_score = out[data_batch['train_mask']]
-                loss = criterion(y_to_score, data_batch['y'])
+                y_ref = torch.flatten(data_batch['y'],0,1)
+                loss = criterion(y_to_score, y_ref)
 
                 if phase == 'train':
                     loss.backward()
@@ -177,7 +178,7 @@ def run2():
     rna_dataset_vanilla = {'file_in': './data/train.json',
                            'filter_noise': True,
                            'nonbond_as_node_feature': True,
-                           'consider_loop_type': False,
+                           'consider_loop_type': True,
                            'create_data' : False}
     print_dict(rna_dataset_vanilla)
     rna_data = RNADataset(**rna_dataset_vanilla)
@@ -194,16 +195,19 @@ def run2():
                              'test': torch.utils.data.DataLoader(Subset(rna_data, test_inds),
                                                                  batch_size=batch_size, shuffle=False)}
 
-    deeper_1d = {'n_hidden_channels': 8,
-                 'n_blocks': 5,
+    deeper_1d = {'n_init_features': 64,
+                 'growth_rate': 16,
+                 'drop_rate': 0.1,
+                 'kernel_sizes' : {'conv0': 3, 'blocks': 3},
+                 'n_blocks': 16,
                  'n_in_channels': rna_data.n_node_dim,
                  'n_out_channels': rna_data.n_pred_dim}
     print_dict(deeper_1d)
     model = DenseDeep1D(**deeper_1d)
 
-    opt_params = {'n_epochs': 40,
-                  'lr_init': 0.01,
-                  'scheduler_step_size': 20,
+    opt_params = {'n_epochs': 120,
+                  'lr_init': 0.1,
+                  'scheduler_step_size': 30,
                   'scheduler_gamma': 0.1,
                   'trainer_save': './trainer_0_save'}
     print_dict(opt_params)
