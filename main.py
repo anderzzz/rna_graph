@@ -230,13 +230,16 @@ def run2():
 
 def run3():
 
+    trainer_out_prefix = 'trainer_save'
+    f_params = open('{}_params.txt'.format(trainer_out_prefix), 'w')
+
     seed_all()
     rna_dataset_vanilla = {'file_in': './data/train.json',
                            'filter_noise': True,
                            'nonbond_as_node_feature': True,
                            'consider_loop_type': False,
                            'create_data' : True}
-    print_dict(rna_dataset_vanilla)
+    print_dict(rna_dataset_vanilla, fout=f_params)
     rna_data = RNADataset(**rna_dataset_vanilla)
 
     frac_test = 0.1
@@ -258,7 +261,7 @@ def run3():
                  'glu_act': True,
                  'n_in_channels': rna_data.n_node_dim,
                  'n_out_channels': rna_data.n_pred_dim}
-    print_dict(deeper_1d)
+    print_dict(deeper_1d, fout=f_params)
     #model = DenseDeep1D(**deeper_1d)
     model = Deep1D_incept(**deeper_1d)
 
@@ -266,17 +269,13 @@ def run3():
                   'lr_init': 0.01,
                   'scheduler_step_size': 10,
                   'scheduler_gamma': 0.2,
-                  'trainer_save': './trainer_0_save'}
-    print_dict(opt_params)
+                  'trainer_save': trainer_out_prefix}
+    print_dict(opt_params, fout=f_params)
+    f_params.flush()
+    f_params.close()
+
     trainer_vanilla(model, rna_structure_loaders, **opt_params)
 
-def run4():
-    rna_dataset_vanilla = {'file_in': './data/test.json',
-                           'filter_noise': True,
-                           'nonbond_as_node_feature': True,
-                           'consider_loop_type': False,
-                           'create_data': True}
-    print_dict(rna_dataset_vanilla)
-    raise RuntimeError
+    print ('Done!')
 
 run3()
