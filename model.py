@@ -317,15 +317,11 @@ class _ConvBlock_A(torch.nn.Module):
         self.conv_b = Conv1d(in_channels=n_inp_features,
                              out_channels=out_ch,
                              groups=1, kernel_size=3, padding_mode='reflect', padding=1)
-        self.conv_c = torch.nn.Sequential(\
-                      Conv1d(in_channels=n_inp_features,
-                             out_channels=n_inp_features,
-                             groups=1, kernel_size=3, padding_mode='reflect', padding=1),
-                      Conv1d(in_channels=n_inp_features,
+        self.conv_c = Conv1d(in_channels=n_inp_features,
                              out_channels=out_ch,
-                             groups=1, kernel_size=3, padding_mode='reflect', padding=1))
+                             groups=1, kernel_size=5, padding_mode='reflect', padding=2)
         self.conv = torch.nn.ModuleList([self.conv_a, self.conv_b, self.conv_c])
-        self.norm = LayerNorm([out_channels * 3, 107])
+        self.norm = LayerNorm(out_channels * 3)
 
     def forward(self, x):
         out_total = []
@@ -337,7 +333,8 @@ class _ConvBlock_A(torch.nn.Module):
                 out = F.relu(out)
             out_total.append(out)
         out = torch.cat(out_total, dim=1)
-        out = self.norm(out)
+        out = self.norm(out.permute(0,2,1))
+        out = out.permute(0,2,1)
         if self.drop_rate > 0:
             out = F.dropout(out, p=self.drop_rate, training=self.training)
         return out
@@ -356,7 +353,7 @@ class Deep1D_incept(torch.nn.Module):
                 self.init_features.append(Conv1d(n_in_channels, vals, kernel_size=1 + 2 * conv_level,
                                                  padding_mode='reflect', padding=conv_level))
         total_init_features = sum(n_init_features)
-        self.norm0 = LayerNorm([total_init_features, 107])
+        self.norm0 = LayerNorm(total_init_features)
         self.act0 = ReLU(inplace=True)
 
         n_layer_channels = n_hidden_channels * 3
@@ -382,9 +379,8 @@ class Deep1D_incept(torch.nn.Module):
         for feature_conv in self.init_features:
             feature_data.append(feature_conv(x_perm))
         x_next = torch.cat(feature_data, dim=1)
-        #raise RuntimeError
-        x_next = self.norm0(x_next)
-        x_next = self.act0(x_next)
+        x_next = self.norm0(x_next.permute(0,2,1))
+        x_next = self.act0(x_next.permute(0,2,1))
 
         x1 = self.features(x_next)
         x2 = self.act_final(x1)
