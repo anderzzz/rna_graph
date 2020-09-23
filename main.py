@@ -22,6 +22,19 @@ def seed_all(seed=42):
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
+def eval_vanilla(model, model_state, dataloaders, eval_save):
+
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+    model.load_state_dict(torch.load(model_state)['model_state_dict'])
+    model.eval()
+
+    results = []
+    for data_batch in dataloaders:
+        out = model(data_batch)
+        results.append(out)
+        raise RuntimeError
+
 def trainer_vanilla(model, dataloaders,
                     n_epochs, lr_init, scheduler_step_size, scheduler_gamma,
                     trainer_save):
@@ -55,7 +68,7 @@ def trainer_vanilla(model, dataloaders,
                 out = model(data_x)
 
                 y_to_score = out[data_batch['train_mask']]
-                y_ref = torch.flatten(data_batch['y'],0,1)
+                y_ref = torch.flatten(data_batch['y'], 0, 1)
                 loss = criterion(y_to_score, y_ref)
 
                 if phase == 'train':
@@ -184,7 +197,7 @@ def run2():
     rna_data = RNADataset(**rna_dataset_vanilla)
 
     frac_test = 0.1
-    batch_size = 16
+    batch_size = 64
     all_inds = list(range(len(rna_data)))
     shuffle(all_inds)
     test_inds = all_inds[:int(frac_test * len(rna_data))]
@@ -222,7 +235,7 @@ def run3():
                            'filter_noise': True,
                            'nonbond_as_node_feature': True,
                            'consider_loop_type': False,
-                           'create_data' : False}
+                           'create_data' : True}
     print_dict(rna_dataset_vanilla)
     rna_data = RNADataset(**rna_dataset_vanilla)
 
@@ -238,10 +251,10 @@ def run3():
                              'test': torch.utils.data.DataLoader(Subset(rna_data, test_inds),
                                                                  batch_size=batch_size, shuffle=False)}
 
-    deeper_1d = {'n_init_features': [8,32,32,16],
-                 'n_hidden_channels': 32,
+    deeper_1d = {'n_init_features': [16,32,0,0],
+                 'n_hidden_channels': 64,
                  'drop_rate': 0.0,
-                 'n_blocks': 20,
+                 'n_blocks': 10,
                  'glu_act': True,
                  'n_in_channels': rna_data.n_node_dim,
                  'n_out_channels': rna_data.n_pred_dim}
@@ -249,12 +262,21 @@ def run3():
     #model = DenseDeep1D(**deeper_1d)
     model = Deep1D_incept(**deeper_1d)
 
-    opt_params = {'n_epochs': 80,
+    opt_params = {'n_epochs': 40,
                   'lr_init': 0.01,
-                  'scheduler_step_size': 20,
-                  'scheduler_gamma': 0.1,
+                  'scheduler_step_size': 10,
+                  'scheduler_gamma': 0.2,
                   'trainer_save': './trainer_0_save'}
     print_dict(opt_params)
     trainer_vanilla(model, rna_structure_loaders, **opt_params)
+
+def run4():
+    rna_dataset_vanilla = {'file_in': './data/test.json',
+                           'filter_noise': True,
+                           'nonbond_as_node_feature': True,
+                           'consider_loop_type': False,
+                           'create_data': True}
+    print_dict(rna_dataset_vanilla)
+    raise RuntimeError
 
 run3()

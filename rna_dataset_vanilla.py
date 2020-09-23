@@ -67,7 +67,7 @@ class RNADataset(Dataset):
         df = pd.read_json(self.file_in, lines=True)
 
         counter = 0
-        for node_props_x, node_props_y, e_index_1, e_index_2, edge_props, n_scored, sn_val, sn_filter in graph_props_x_(df, self.consider_loop_type):
+        for id_label, node_props_x, node_props_y, e_index_1, e_index_2, edge_props, n_scored, sn_val, sn_filter in graph_props_x_(df, self.consider_loop_type):
 
             # Ignore all data that does not meet signal-noise threshold, provided such flag is given (not the case for test data)
             if not sn_filter is None:
@@ -92,7 +92,10 @@ class RNADataset(Dataset):
             train_mask = torch.zeros(x.shape[0], dtype=torch.bool)
             train_mask[:n_scored] = True
 
-            torch.save({'x' : x, 'y' : y, 'train_mask' : train_mask, 'sn_filter' : sn_filter},
+            torch.save({'id_label' : id_label,
+                        'x' : x, 'y' : y,
+                        'train_mask' : train_mask,
+                        'sn_filter' : sn_filter},
                        '{}/{}_{}.pt'.format(self.save_dir, ALL_DATA_NAME, counter))
             counter += 1
 
@@ -106,7 +109,10 @@ class RNADataset(Dataset):
 
     @property
     def n_pred_dim(self):
-        return self.__getitem__(0)['y'].shape[-1]
+        try:
+            return self.__getitem__(0)['y'].shape[-1]
+        except KeyError:
+            raise RuntimeError('Predicted dimension not available from data. Are you using test data?')
 
     @property
     def n_node_dim(self):

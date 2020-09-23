@@ -128,4 +128,8 @@ def graph_props_x_(df, consider_loop_type):
             sn_val = None
             sn_filter = None
 
-        yield node_features_x, node_features_y, e_index_1, e_index_2, edge_prop, row['seq_scored'], sn_val, sn_filter
+        yield row['id'], \
+              node_features_x, node_features_y, \
+              e_index_1, e_index_2, edge_prop, \
+              row['seq_scored'], \
+              sn_val, sn_filter
