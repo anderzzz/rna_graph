@@ -1,4 +1,4 @@
-'''Creation of Graph Dataset from RNA rawdata
+'''Creation of Datasets from RNA rawdata
 
 '''
 import os
@@ -11,7 +11,19 @@ from rawdata import graph_props_x_, create_node_nbond
 ALL_DATA_NAME = 'rna_save_file'
 
 class RNADataset(Dataset):
-    '''Bla bla for now
+    '''RNA Dataset for PyTorch Deep Learning
+
+    Args:
+        file_in (str): Path to JSON file with raw data as obtained from Kaggle
+        tmp_file_dir (str, optional): Path to directory in which processed dataset files are saved
+        create_data (bool, optional): If True, the processed dataset files are created from the raw data. If False, the
+            processed files are only linked to. The latter is a dangerous option since no validation of creation
+            parameters is done
+        filter_noise (bool, optional): Remove data from consideration with a flagged signal-noise value
+        nonbond_as_node_feature (bool, optional): Add to the node features the non-bonded interaction the corresponding
+            nucleotide engages in, which is either no interaction, A-U interaction, C-G interaction, or other pairing.
+        consider_loop_type (bool, optional): Add to the node features the predicted loop type the corresponding
+            nucleotide engages in
 
     '''
     def __init__(self, file_in, tmp_file_dir='./tmp_out', create_data=True, filter_noise=True,
@@ -28,35 +40,40 @@ class RNADataset(Dataset):
 
         if create_data:
             self._create_data()
-            with open('toc.csv', 'w') as fout:
+            with open('{}/toc.csv'.format(self.save_dir), 'w') as fout:
                 print ('total_processed, {}'.format(self.total_processed), file=fout)
         else:
-            with open('toc.csv', 'r') as fin:
+            with open('{}/toc.csv'.format(self.save_dir), 'r') as fin:
                 self.total_processed = int(fin.readline().split(',')[1])
                 print (self.total_processed)
-            print ('Data no created, only loaded. Noise filter and node feature configurations implied.')
+            print ('Data not created, only loaded. Noise filter and node feature configurations implied.')
 
         super(RNADataset, self).__init__()
 
     def get_raw_data(self, idx):
+        '''Convenience function for debugging. Provides raw data for the given IDX, corresponding to the IDX
+        from the __getitem__ function of the dataset
 
+        '''
         df = pd.read_json(self.file_in, lines=True)
         if self.filter_noise:
             df = df.loc[df['SN_filter'] == 1]
         return df.iloc[idx]
 
     def _create_data(self):
+        '''Creates the data from the raw data
 
-        # Include rows that are explicitly provided
+        '''
         df = pd.read_json(self.file_in, lines=True)
 
         counter = 0
         for node_props_x, node_props_y, e_index_1, e_index_2, edge_props, n_scored, sn_val, sn_filter in graph_props_x_(df, self.consider_loop_type):
 
-            # Ignore all data that does not meet signal-noise threshold
-            if self.filter_noise:
-                if sn_filter != 1:
-                    continue
+            # Ignore all data that does not meet signal-noise threshold, provided such flag is given (not the case for test data)
+            if not sn_filter is None:
+                if self.filter_noise:
+                    if sn_filter != 1:
+                        continue
 
             # Add feature of incoming edges to node as a node feature
             if self.nonbond_nodefeature:
@@ -95,28 +112,4 @@ class RNADataset(Dataset):
     def n_node_dim(self):
         return self.__getitem__(0)['x'].shape[-1]
 
-
-def test1():
-    rna_data = RNADataset('./data/train.json', './tmp_out', True, True, True)
-    print (rna_data)
-    print (rna_data[0])
-
-    rna_data = RNADataset('./data/train.json', './tmp_out', True, True, False)
-    print (rna_data)
-    print (rna_data[5])
-    print (rna_data[5]['x'])
-    print (rna_data.get_raw_data(5).structure)
-    print (rna_data.get_raw_data(5).sequence)
-
-def test2():
-    rna_data = RNADataset('./data/train.json', './tmp_out', create_data=True, filter_noise=True,
-                          consider_loop_type=False, nonbond_as_node_feature=True)
-    dloader = DataLoader(rna_data, batch_size=20)
-    for the_batch in dloader:
-        print (the_batch['x'].shape)
-        print (the_batch['train_mask'].shape)
-
-    rna_data2 = RNADataset('./data/train.json', './tmp_out', create_data=False)
-    print (rna_data2[0])
-    print (rna_data2[0]['x'].shape)
 
