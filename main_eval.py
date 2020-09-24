@@ -39,6 +39,7 @@ def run4():
                            'filter_noise': True,
                            'nonbond_as_node_feature': True,
                            'consider_loop_type': False,
+                           'consider_seqdist': True,
                            'create_data': True}
     print_dict(rna_dataset_vanilla)
     rna_data = RNADataset(**rna_dataset_vanilla)
@@ -57,6 +58,6 @@ def run4():
     model = Deep1D_incept(**deeper_1d)
 
     with open('out_eval.csv', 'w') as fout:
-        eval_vanilla(model, './trainer_save_1.pt', ddd, fout)
+        eval_vanilla(model, './trainer_save_3.pt', ddd, fout)
 
 run4()

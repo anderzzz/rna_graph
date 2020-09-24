@@ -185,49 +185,6 @@ def run1():
     print_dict(opt_params)
     trainer_graph(model, rna_structure_loaders, **opt_params)
 
-def run2():
-
-    seed_all()
-    rna_dataset_vanilla = {'file_in': './data/train.json',
-                           'filter_noise': True,
-                           'nonbond_as_node_feature': True,
-                           'consider_loop_type': False,
-                           'create_data' : False}
-    print_dict(rna_dataset_vanilla)
-    rna_data = RNADataset(**rna_dataset_vanilla)
-
-    frac_test = 0.1
-    batch_size = 64
-    all_inds = list(range(len(rna_data)))
-    shuffle(all_inds)
-    test_inds = all_inds[:int(frac_test * len(rna_data))]
-    train_inds = all_inds[int(frac_test * len(rna_data)):]
-
-    rna_structure_loaders = {'train': torch.utils.data.DataLoader(Subset(rna_data, train_inds),
-                                                                  batch_size=batch_size, shuffle=True),
-                             'test': torch.utils.data.DataLoader(Subset(rna_data, test_inds),
-                                                                 batch_size=batch_size, shuffle=False)}
-
-    deeper_1d = {'n_init_features': [8,32,0,0],
-                 'growth_rate': 32,
-                 'drop_rate': 0.0,
-                 'kernel_internal' : 3,
-                 'n_blocks': 24,
-                 'glu_act': True,
-                 'n_in_channels': rna_data.n_node_dim,
-                 'n_out_channels': rna_data.n_pred_dim}
-    print_dict(deeper_1d)
-    #model = DenseDeep1D(**deeper_1d)
-    model = DenseDeep1D_incept(**deeper_1d)
-
-    opt_params = {'n_epochs': 80,
-                  'lr_init': 0.01,
-                  'scheduler_step_size': 20,
-                  'scheduler_gamma': 0.1,
-                  'trainer_save': './trainer_0_save'}
-    print_dict(opt_params)
-    trainer_vanilla(model, rna_structure_loaders, **opt_params)
-
 def run3():
 
     trainer_out_prefix = 'trainer_save'
@@ -238,6 +195,7 @@ def run3():
                            'filter_noise': True,
                            'nonbond_as_node_feature': True,
                            'consider_loop_type': False,
+                           'consider_seqdist': True,
                            'create_data' : True}
     print_dict(rna_dataset_vanilla, fout=f_params)
     rna_data = RNADataset(**rna_dataset_vanilla)
@@ -254,10 +212,10 @@ def run3():
                              'test': torch.utils.data.DataLoader(Subset(rna_data, test_inds),
                                                                  batch_size=batch_size, shuffle=False)}
 
-    deeper_1d = {'n_init_features': [16,32,0,0],
-                 'n_hidden_channels': 64,
+    deeper_1d = {'n_init_features': [16,32,32,16],
+                 'n_hidden_channels': 32,
                  'drop_rate': 0.0,
-                 'n_blocks': 10,
+                 'n_blocks': 15,
                  'glu_act': True,
                  'n_in_channels': rna_data.n_node_dim,
                  'n_out_channels': rna_data.n_pred_dim}
@@ -265,7 +223,7 @@ def run3():
     #model = DenseDeep1D(**deeper_1d)
     model = Deep1D_incept(**deeper_1d)
 
-    opt_params = {'n_epochs': 30,
+    opt_params = {'n_epochs': 40,
                   'lr_init': 0.01,
                   'scheduler_step_size': 10,
                   'scheduler_gamma': 0.2,

@@ -2,6 +2,7 @@
 
 '''
 import pandas as pd
+import numpy as np
 
 '''Encode the nucleotide as one-hot vector'''
 RNA_ONEHOT = {'G' : [1,0,0,0], 'C' : [0,1,0,0], 'A' : [0,0,1,0], 'U' : [0,0,0,1]}
@@ -104,6 +105,93 @@ def create_node_nbond(props_x, e1, e2, edge_props):
 
     return ret
 
+def create_seqdist_nodefeature(props_x, e1, e2):
+
+    val = {}
+    for ee1, ee2 in zip(e1, e2):
+        dee = abs(ee1 - ee2)
+        if dee > 1:
+            val[ee1] = dee
+
+    ret = []
+    for node_id, node_prop in enumerate(props_x):
+        if node_id in val:
+            to_add = [val[node_id]]
+        else:
+            to_add = [0]
+        ret.append(node_prop + to_add)
+
+    return ret
+
+def _rna_bond(n1, n2):
+    [m1, m2] = sorted([n1, n2])
+    if m1 == 'A' and m2 == 'U':
+        return [1.0,0.0,0.0]
+    elif m1 == 'C' and m2 == 'G':
+        return [0.0,1.0,0.0]
+    else:
+        return [0.0,0.0,1.0]
+
+def _seq_dist_bin(d1, d2):
+    dd = abs(d1 - d2)
+    if dd <= 6:
+        return [1.0,0.0,0.0,0.0]
+    elif dd >= 7 and dd <= 12:
+        return [0.0,1.0,0.0,0.0]
+    elif dd >=13 and dd <=18:
+        return [0.0,0.0,1.0,0.0]
+    else:
+        return [0.0,0.0,0.0,1.0]
+
+def create_graph_matrix_bpp(id, seq):
+
+    array = np.load('/Users/andersohrn/PycharmProjects/rna_graph/data/bpps/{}.npy'.format(id))
+    feature_vecs = []
+    for k_nuc, (nuc, pairprob) in enumerate(zip(seq, array)):
+        nuc_vec = RNA_ONEHOT[nuc]
+        bond_vecs = []
+        bond_dists = []
+        for k_pp, pp in enumerate(pairprob):
+            if pp > 0.0:
+                bond_vecs.append([x * pp for x in _rna_bond(nuc, seq[k_pp])])
+                bond_dists.append([x * pp for x in _seq_dist_bin(k_nuc, k_pp)])
+
+        bond_vec = [0.0, 0.0, 0.0]
+        for bv in bond_vecs:
+            bond_vec[0] += bv[0]
+            bond_vec[1] += bv[1]
+            bond_vec[2] += bv[2]
+        seq_vec = [0.0, 0.0, 0.0, 0.0]
+        for sv in bond_dists:
+            seq_vec[0] += sv[0]
+            seq_vec[1] += sv[1]
+            seq_vec[2] += sv[2]
+            seq_vec[3] += sv[3]
+
+        feature_vecs.append(nuc_vec + bond_vec + seq_vec)
+    return feature_vecs
+
+def vanilla_props_(df):
+    for row_id, row in df.iterrows():
+        f_vecs = create_graph_matrix_bpp(row.id, row.sequence)
+
+        if Y_NAMES[0] in row.index:
+            node_features_y = create_node_y_features(row.loc[Y_NAMES])
+        else:
+            node_features_y = None
+
+        if 'signal_to_noise' in row.index:
+            sn_val = row['signal_to_noise']
+            sn_filter = row['SN_filter']
+        else:
+            sn_val = None
+            sn_filter = None
+
+        yield row['id'], \
+              f_vecs, node_features_y, \
+              row['seq_scored'], \
+              sn_val, sn_filter
+
 def graph_props_x_(df, consider_loop_type):
 
     for row_id, row in df.iterrows():
@@ -112,7 +200,10 @@ def graph_props_x_(df, consider_loop_type):
         else:
             node_features_x = create_node_features(row.sequence)
 
-        e_index_1, e_index_2, edge_prop = create_graph_matrix(row.structure, row.sequence)
+        #e_index_1, e_index_2, edge_prop = create_graph_matrix(row.structure, row.sequence)
+        print (row.structure)
+        e_index_1, e_index_2, edge_prop = create_graph_matrix_bpp(row.id, row.sequence)
+        raise RuntimeError
 
         if Y_NAMES[0] in row.index:
             node_features_y = create_node_y_features(row.loc[Y_NAMES])

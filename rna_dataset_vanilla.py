@@ -7,7 +7,7 @@ import pandas as pd
 import torch
 from torch.utils.data import Dataset, DataLoader
 
-from rawdata import graph_props_x_, create_node_nbond
+from rawdata import graph_props_x_, create_node_nbond, create_seqdist_nodefeature, vanilla_props_
 ALL_DATA_NAME = 'rna_save_file'
 
 class RNADataset(Dataset):
@@ -27,19 +27,22 @@ class RNADataset(Dataset):
 
     '''
     def __init__(self, file_in, tmp_file_dir='./tmp_out', create_data=True, filter_noise=True,
-                 nonbond_as_node_feature=True, consider_loop_type=True):
+                 bpp_root='./data/bpps',
+                 nonbond_as_node_feature=True, consider_loop_type=True, consider_seqdist=True):
 
         self.file_in = file_in
         self.save_dir = tmp_file_dir
         self.filter_noise = filter_noise
+        self.bpps = bpp_root
         self.nonbond_nodefeature = nonbond_as_node_feature
         self.consider_loop_type = consider_loop_type
+        self.seqdist_nodefeature = consider_seqdist
 
         if not os.path.exists(self.save_dir):
             os.makedirs(self.save_dir)
 
         if create_data:
-            self._create_data()
+            self._create_data_2()
             with open('{}/toc.csv'.format(self.save_dir), 'w') as fout:
                 print ('total_processed, {}'.format(self.total_processed), file=fout)
         else:
@@ -60,6 +63,39 @@ class RNADataset(Dataset):
             df = df.loc[df['SN_filter'] == 1]
         return df.iloc[idx]
 
+    def _create_data_2(self):
+
+        df = pd.read_json(self.file_in, lines=True)
+        counter = 0
+        for id_label, node_vec_x, node_vec_y, n_scored, sn_val, sn_filter in vanilla_props_(df):
+
+            # Ignore all data that does not meet signal-noise threshold, provided such flag is given (not the case for test data)
+            if not sn_filter is None:
+                if self.filter_noise:
+                    if sn_filter != 1:
+                        continue
+
+            x = torch.tensor(node_vec_x, dtype=torch.float)
+
+            # Add ground-truth node features
+            if not node_vec_y is None:
+                y = torch.tensor(node_vec_y, dtype=torch.float)
+            else:
+                y = None
+
+            # Create mask for which nodes are to be predicted
+            train_mask = torch.zeros(x.shape[0], dtype=torch.bool)
+            train_mask[:n_scored] = True
+
+            torch.save({'id_label': id_label,
+                        'x': x, 'y': y,
+                        'train_mask': train_mask,
+                        'sn_filter': sn_filter},
+                       '{}/{}_{}.pt'.format(self.save_dir, ALL_DATA_NAME, counter))
+            counter += 1
+
+        self.total_processed = counter
+
     def _create_data(self):
         '''Creates the data from the raw data
 
@@ -78,6 +114,8 @@ class RNADataset(Dataset):
             # Add feature of incoming edges to node as a node feature
             if self.nonbond_nodefeature:
                 node_nbond_feature = create_node_nbond(node_props_x, e_index_1, e_index_2, edge_props)
+                if self.seqdist_nodefeature:
+                    node_nbond_feature = create_seqdist_nodefeature(node_nbond_feature, e_index_1, e_index_2)
                 x = torch.tensor(node_nbond_feature, dtype=torch.float)
             else:
                 x = torch.tensor(node_props_x, dtype=torch.float)
