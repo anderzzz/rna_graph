@@ -233,7 +233,7 @@ def run3():
     trainer_out_prefix = 'trainer_save'
     f_params = open('{}_params.txt'.format(trainer_out_prefix), 'w')
 
-    seed_all()
+    seed_all(111)
     rna_dataset_vanilla = {'file_in': './data/train.json',
                            'filter_noise': True,
                            'nonbond_as_node_feature': True,
@@ -265,7 +265,7 @@ def run3():
     #model = DenseDeep1D(**deeper_1d)
     model = Deep1D_incept(**deeper_1d)
 
-    opt_params = {'n_epochs': 40,
+    opt_params = {'n_epochs': 30,
                   'lr_init': 0.01,
                   'scheduler_step_size': 10,
                   'scheduler_gamma': 0.2,

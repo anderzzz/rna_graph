@@ -337,6 +337,7 @@ class _ConvBlock_A(torch.nn.Module):
         out = out.permute(0,2,1)
         if self.drop_rate > 0:
             out = F.dropout(out, p=self.drop_rate, training=self.training)
+
         return out
 
 class Deep1D_incept(torch.nn.Module):
