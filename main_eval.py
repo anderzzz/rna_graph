@@ -19,16 +19,15 @@ def eval_vanilla(model, model_state, data, eval_save):
     model.load_state_dict(torch.load(model_state)['model_state_dict'])
     model.eval()
 
-    print ('id_seqpos,' + ','.join(Y_NAMES))
+    print ('id_seqpos,' + ','.join(Y_NAMES), file=eval_save)
     for k_batch, data_batch in enumerate(data):
         data_x = data_batch['x'].unsqueeze(0)
         data_x = data_x.to(device)
 
         out = model(data_x)
         for csv_row in format_for_submission_(out, data_batch['id_label']):
-            print (csv_row)
+            print (csv_row, file=eval_save)
 
-        raise RuntimeError
 
 def print_dict(dd, fout=sys.stdout):
     for key, value in dd.items():
@@ -57,7 +56,7 @@ def run4():
     print_dict(deeper_1d)
     model = Deep1D_incept(**deeper_1d)
 
-    eval_vanilla(model, './trainer_0_save_a.pt', ddd, 'tmp_eval.csv')
-    raise RuntimeError
+    with open('out_eval.csv', 'w') as fout:
+        eval_vanilla(model, './trainer_save_1.pt', ddd, fout)
 
 run4()
