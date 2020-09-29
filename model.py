@@ -7,7 +7,7 @@ import torch
 from torch.nn.utils import weight_norm
 import torch.nn.functional as F
 from torch_geometric.nn import GCNConv, GMMConv, ChebConv, SGConv, GENConv, DeepGCNLayer
-from torch.nn import Conv1d, ReLU, Linear, BatchNorm1d, LayerNorm
+from torch.nn import Conv1d, ReLU, Linear, BatchNorm1d, LayerNorm, Sequential
 
 from torch_geometric.data import Data
 
@@ -387,3 +387,93 @@ class Deep1D_incept(torch.nn.Module):
         x2 = self.act_final(x1)
         out = self.regression(x2.permute(0,2,1))
         return out
+
+class _ResBlock(torch.nn.Module):
+
+    def __init__(self, in_channels, out_channels, hidden_channels, kernel_types):
+        super(_ResBlock, self).__init__()
+
+        k_params = []
+        for k_type in kernel_types:
+            if k_type == 'basic':
+                k_size = 3
+                k_stride = 1
+                k_dilation = 1
+                k_padding = int((k_size - 1) / 2)
+
+            elif k_type == 'dilated':
+                k_size = 3
+                k_stride = 1
+                k_dilation = 2
+                k_padding = int((k_size - 1) / 2)
+
+            else:
+                raise IndexError('Unknown kernel type provided: {}'.format(k_type))
+
+            k_params.append((k_size, k_stride, k_dilation, k_padding))
+
+        self.comp_units = torch.nn.ModuleDict({
+            'conv1d_0' : Conv1d(in_channels=in_channels, out_channels=hidden_channels,
+                                kernel_size=k_params[0][0],
+                                stride=k_params[0][1],
+                                dilation=k_params[0][2],
+                                padding=k_params[0][3]),
+            'norm_0' : LayerNorm(hidden_channels),
+            'act_0' : ReLU(inplace=True),
+            'conv1d_1' : Conv1d(in_channels=hidden_channels, out_channels=out_channels,
+                                kernel_size=k_params[1][0],
+                                stride=k_params[1][1],
+                                dilation=k_params[1][2],
+                                padding=k_params[1][3]),
+            'norm_1' : LayerNorm(out_channels),
+            'act_final' : ReLU(inplace=True)}
+        )
+
+        if in_channels == out_channels:
+            self.dim_mapper = torch.nn.Identity()
+        else:
+            self.dim_mapper = torch.nn.Linear(in_channels, out_channels, bias=False)
+
+    def forward(self, x):
+        x = x.permute(0, 2, 1)
+        h0 = self.comp_units['conv1d_0'](x)
+        h1 = self.comp_units['norm_0'](h0.permute(0, 2, 1)).permute(0, 2, 1)
+        h2 = self.comp_units['act_0'](h1)
+        h3 = self.comp_units['conv1d_1'](h2)
+        h = self.comp_units['norm_1'](h3.permute(0, 2, 1)).permute(0, 2, 1)
+        x_reshape = self.dim_mapper(x.permute(0, 2, 1)).permute(0, 2, 1)
+        x_new = self.comp_units['act_final'](x_reshape + h)
+        return x_new.permute(0, 2, 1)
+
+class Res1D(torch.nn.Module):
+
+    def __init__(self, in_channels, out_channels, nblocks, hidden_progression):
+        super(Res1D, self).__init__()
+
+        self.nblocks = nblocks
+
+        self.blocks = Sequential(OrderedDict())
+        self.blocks.add_module('block_0',
+                               _ResBlock(in_channels=in_channels, out_channels=hidden_progression[0],
+                                         hidden_channels=hidden_progression[0],
+                                         kernel_types=('basic', 'basic')))
+
+        for kblock in range(self.nblocks - 1):
+            self.blocks.add_module('block_{}'.format(kblock + 1),
+                                   _ResBlock(in_channels=hidden_progression[kblock],
+                                             out_channels=hidden_progression[kblock + 1],
+                                             hidden_channels=hidden_progression[kblock + 1],
+                                             kernel_types=('basic', 'basic')))
+
+        self.mlp = Sequential(Linear(in_features=hidden_progression[self.nblocks - 1],
+                                     out_features=hidden_progression[self.nblocks - 1]),
+                              ReLU(inplace=True),
+                              Linear(in_features=hidden_progression[self.nblocks - 1],
+                                     out_features=out_channels))
+
+    def forward(self, x):
+
+        x_feats = self.blocks(x)
+        y_pred = self.mlp(x_feats)
+
+        return y_pred

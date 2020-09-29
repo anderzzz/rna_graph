@@ -11,7 +11,7 @@ from torch import optim
 from torch.utils.data import Subset
 import torch_geometric
 
-from model import DeeperGCN, DenseDeep1D, DenseDeep1D_incept, Deep1D_incept
+from model import DeeperGCN, DenseDeep1D, DenseDeep1D_incept, Deep1D_incept, Res1D
 from rna_dataset_graph import RNADatasetGraph
 from rna_dataset_vanilla import RNADataset
 from loss import MCRMSELoss
@@ -212,10 +212,10 @@ def run3():
                              'test': torch.utils.data.DataLoader(Subset(rna_data, test_inds),
                                                                  batch_size=batch_size, shuffle=False)}
 
-    deeper_1d = {'n_init_features': [16,32,32,16],
-                 'n_hidden_channels': 32,
-                 'drop_rate': 0.0,
-                 'n_blocks': 15,
+    deeper_1d = {'n_init_features': [16,64,64,64],
+                 'n_hidden_channels': 64,
+                 'drop_rate': 0.05,
+                 'n_blocks': 12,
                  'glu_act': True,
                  'n_in_channels': rna_data.n_node_dim,
                  'n_out_channels': rna_data.n_pred_dim}
@@ -236,4 +236,51 @@ def run3():
 
     print ('Done!')
 
-run3()
+def run4():
+
+    trainer_out_prefix = 'trainer_save'
+    f_params = open('{}_params.txt'.format(trainer_out_prefix), 'w')
+
+    seed_all(111)
+    rna_dataset_vanilla = {'file_in': './data/train.json',
+                           'filter_noise': True,
+                           'nonbond_as_node_feature': True,
+                           'consider_loop_type': False,
+                           'consider_seqdist': True,
+                           'create_data' : True}
+    print_dict(rna_dataset_vanilla, fout=f_params)
+    rna_data = RNADataset(**rna_dataset_vanilla)
+
+    frac_test = 0.1
+    batch_size = 16
+    all_inds = list(range(len(rna_data)))
+    shuffle(all_inds)
+    test_inds = all_inds[:int(frac_test * len(rna_data))]
+    train_inds = all_inds[int(frac_test * len(rna_data)):]
+
+    rna_structure_loaders = {'train': torch.utils.data.DataLoader(Subset(rna_data, train_inds),
+                                                                  batch_size=batch_size, shuffle=True),
+                             'test': torch.utils.data.DataLoader(Subset(rna_data, test_inds),
+                                                                 batch_size=batch_size, shuffle=False)}
+
+    deeper_1d = {'in_channels' : rna_data.n_node_dim,
+                 'out_channels' : rna_data.n_pred_dim,
+                 'nblocks' : 5,
+                 'hidden_progression' : [32, 32, 64, 64, 128]}
+    print_dict(deeper_1d, fout=f_params)
+    model = Res1D(**deeper_1d)
+
+    opt_params = {'n_epochs': 40,
+                  'lr_init': 0.01,
+                  'scheduler_step_size': 10,
+                  'scheduler_gamma': 0.2,
+                  'trainer_save': trainer_out_prefix}
+    print_dict(opt_params, fout=f_params)
+    f_params.flush()
+    f_params.close()
+
+    trainer_vanilla(model, rna_structure_loaders, **opt_params)
+
+    print ('Done!')
+
+run4()
