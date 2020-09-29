@@ -390,9 +390,10 @@ class Deep1D_incept(torch.nn.Module):
 
 class _ResBlock(torch.nn.Module):
 
-    def __init__(self, in_channels, out_channels, hidden_channels, kernel_types):
+    def __init__(self, in_channels, out_channels, hidden_channels, kernel_types, p_dropout=0.0):
         super(_ResBlock, self).__init__()
 
+        self.p_dropout = p_dropout
         k_params = []
         for k_type in kernel_types:
             if k_type == 'basic':
@@ -442,6 +443,7 @@ class _ResBlock(torch.nn.Module):
         h3 = self.comp_units['conv1d_1'](h2)
         h = self.comp_units['norm_1'](h3.permute(0, 2, 1)).permute(0, 2, 1)
         x_reshape = self.dim_mapper(x.permute(0, 2, 1)).permute(0, 2, 1)
+        x_reshape = F.dropout(x_reshape, self.p_dropout)
         x_new = self.comp_units['act_final'](x_reshape + h)
         return x_new.permute(0, 2, 1)
 

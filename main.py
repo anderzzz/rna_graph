@@ -265,15 +265,20 @@ def run4():
 
     deeper_1d = {'in_channels' : rna_data.n_node_dim,
                  'out_channels' : rna_data.n_pred_dim,
-                 'nblocks' : 5,
-                 'hidden_progression' : [32, 32, 64, 64, 128]}
+                 'nblocks' : 24,
+                 'hidden_progression' : [64, 64, 64, 64,
+                                         64, 64, 64, 64,
+                                         128, 128, 128, 128,
+                                         128, 128, 128, 128,
+                                         256, 256, 256, 256,
+                                         256, 256, 256, 256]}
     print_dict(deeper_1d, fout=f_params)
     model = Res1D(**deeper_1d)
 
     opt_params = {'n_epochs': 40,
                   'lr_init': 0.01,
                   'scheduler_step_size': 10,
-                  'scheduler_gamma': 0.2,
+                  'scheduler_gamma': 0.1,
                   'trainer_save': trainer_out_prefix}
     print_dict(opt_params, fout=f_params)
     f_params.flush()
