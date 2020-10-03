@@ -3,7 +3,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from rna_dataset_vanilla import RNADataset
-from model import Deep1D_incept
+from model import Deep1D_incept, Res1D
 from rawdata import Y_NAMES
 
 def format_for_submission_(x, label, dec=6):
@@ -47,10 +47,10 @@ def run4():
     print (len(rna_data))
     ddd = DataLoader(rna_data, batch_size=None, shuffle=False)
 
-    deeper_1d = {'n_init_features': [16, 32, 0, 0],
+    deeper_1d = {'n_init_features': [64, 128, 128, 128],
                  'n_hidden_channels': 64,
-                 'drop_rate': 0.0,
-                 'n_blocks': 10,
+                 'drop_rate': 0.05,
+                 'n_blocks': 16,
                  'glu_act': True,
                  'n_in_channels': rna_data.n_node_dim,
                  'n_out_channels': 5}
@@ -58,6 +58,33 @@ def run4():
     model = Deep1D_incept(**deeper_1d)
 
     with open('out_eval.csv', 'w') as fout:
-        eval_vanilla(model, './trainer_save_3.pt', ddd, fout)
+        eval_vanilla(model, './trainer_save_9.pt', ddd, fout)
+
+def run5():
+    rna_dataset_vanilla = {'file_in': './data/test.json',
+                           'tmp_file_dir' : './tmp_out_eval',
+                           'filter_noise': True,
+                           'nonbond_as_node_feature': True,
+                           'consider_loop_type': False,
+                           'consider_seqdist': True,
+                           'create_data': True}
+    print_dict(rna_dataset_vanilla)
+    rna_data = RNADataset(**rna_dataset_vanilla)
+    print (rna_data)
+    print (len(rna_data))
+    ddd = DataLoader(rna_data, batch_size=None, shuffle=False)
+
+    deeper_1d = {'in_channels' : rna_data.n_node_dim,
+                 'out_channels' : 5,
+                 'nblocks': 20,
+                 'hidden_progression' : [256, 256, 256, 256,
+                                         256, 256, 256, 256,
+                                         512, 512, 512, 512,
+                                         512, 512, 512, 512,
+                                         1024, 1024, 1024, 1024]}
+    print_dict(deeper_1d)
+    model = Res1D(**deeper_1d)
+    with open('out_eval.csv', 'w') as fout:
+        eval_vanilla(model, './trainer_save_7.pt', ddd, fout)
 
 run4()

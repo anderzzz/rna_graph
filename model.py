@@ -159,12 +159,12 @@ class _DenserConvBlock_bottleneck(torch.nn.Module):
         self.act_a = ReLU(inplace=True)
         self.conv1d_a = Conv1d(in_channels=n_inp_features,
                                out_channels=growth_rate * bottle_factor,
-                               kernel_size=kernel_size, padding_mode='reflect', padding=int((kernel_size-1)/2))
+                               kernel_size=kernel_size, padding_mode='zeros', padding=int((kernel_size-1)/2))
         self.norm_b = LayerNorm([growth_rate * bottle_factor, 107])
         self.act_b = ReLU(inplace=True)
         self.conv1d_b = Conv1d(in_channels=growth_rate * bottle_factor,
                                out_channels=growth_rate,
-                               kernel_size=kernel_size, padding_mode='reflect', padding=int((kernel_size-1)/2))
+                               kernel_size=kernel_size, padding_mode='zeros', padding=int((kernel_size-1)/2))
 
     def forward(self, x):
         out = self.norm_a(x)
@@ -195,7 +195,7 @@ class _DenseConvBlock(torch.nn.Module):
 
         self.conv1d = Conv1d(in_channels=n_inp_features,
                              out_channels=out_ch,
-                             groups=1, kernel_size=kernel_size, padding_mode='reflect', padding=int((kernel_size-1)/2))
+                             groups=1, kernel_size=kernel_size, padding_mode='zeros', padding=int((kernel_size-1)/2))
         self.norm = LayerNorm([growth_rate, 107])
 
     def forward(self, x):
@@ -220,7 +220,7 @@ class DenseDeep1D(torch.nn.Module):
         self.n_blocks = n_blocks
         self.features = torch.nn.Sequential(OrderedDict([
             ('conv0', Conv1d(n_in_channels, n_init_features, kernel_size=kernel_sizes['conv0'],
-                             padding_mode='reflect', padding=int((kernel_sizes['conv0']-1)/2))),
+                             padding_mode='zeros', padding=int((kernel_sizes['conv0']-1)/2))),
             ('norm0', LayerNorm([n_init_features, 107])),
             ('relu0', ReLU(inplace=True))
         ]))
@@ -263,7 +263,7 @@ class DenseDeep1D_incept(torch.nn.Module):
         for conv_level, vals in enumerate(n_init_features):
             if vals > 0:
                 self.init_features.append(Conv1d(n_in_channels, vals, kernel_size=1 + 2 * conv_level,
-                                                 padding_mode='reflect', padding=conv_level))
+                                                 padding_mode='zeros', padding=conv_level))
         total_init_features = sum(n_init_features)
         self.norm0 = LayerNorm([total_init_features, 107])
         self.act0 = ReLU(inplace=True)
@@ -313,13 +313,13 @@ class _ConvBlock_A(torch.nn.Module):
 
         self.conv_a = Conv1d(in_channels=n_inp_features,
                              out_channels=out_ch,
-                             groups=1, kernel_size=1, padding_mode='reflect', padding=0)
+                             groups=1, kernel_size=1, padding_mode='zeros', padding=0)
         self.conv_b = Conv1d(in_channels=n_inp_features,
                              out_channels=out_ch,
-                             groups=1, kernel_size=3, padding_mode='reflect', padding=1)
+                             groups=1, kernel_size=3, padding_mode='zeros', padding=1)
         self.conv_c = Conv1d(in_channels=n_inp_features,
                              out_channels=out_ch,
-                             groups=1, kernel_size=5, padding_mode='reflect', padding=2)
+                             groups=1, kernel_size=5, padding_mode='zeros', padding=2)
         self.conv = torch.nn.ModuleList([self.conv_a, self.conv_b, self.conv_c])
         self.norm = LayerNorm(out_channels * 3)
 
@@ -352,7 +352,7 @@ class Deep1D_incept(torch.nn.Module):
         for conv_level, vals in enumerate(n_init_features):
             if vals > 0:
                 self.init_features.append(Conv1d(n_in_channels, vals, kernel_size=1 + 2 * conv_level,
-                                                 padding_mode='reflect', padding=conv_level))
+                                                 padding_mode='zeros', padding=conv_level))
         total_init_features = sum(n_init_features)
         self.norm0 = LayerNorm(total_init_features)
         self.act0 = ReLU(inplace=True)
@@ -449,7 +449,7 @@ class _ResBlock(torch.nn.Module):
 
 class Res1D(torch.nn.Module):
 
-    def __init__(self, in_channels, out_channels, nblocks, hidden_progression):
+    def __init__(self, in_channels, out_channels, nblocks, hidden_progression, p_dropout=0.0):
         super(Res1D, self).__init__()
 
         self.nblocks = nblocks
@@ -458,14 +458,16 @@ class Res1D(torch.nn.Module):
         self.blocks.add_module('block_0',
                                _ResBlock(in_channels=in_channels, out_channels=hidden_progression[0],
                                          hidden_channels=hidden_progression[0],
-                                         kernel_types=('basic', 'basic')))
+                                         kernel_types=('basic', 'basic'),
+                                         p_dropout=p_dropout))
 
         for kblock in range(self.nblocks - 1):
             self.blocks.add_module('block_{}'.format(kblock + 1),
                                    _ResBlock(in_channels=hidden_progression[kblock],
                                              out_channels=hidden_progression[kblock + 1],
                                              hidden_channels=hidden_progression[kblock + 1],
-                                             kernel_types=('basic', 'basic')))
+                                             kernel_types=('basic', 'basic'),
+                                             p_dropout=p_dropout))
 
         self.mlp = Sequential(Linear(in_features=hidden_progression[self.nblocks - 1],
                                      out_features=hidden_progression[self.nblocks - 1]),

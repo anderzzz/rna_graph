@@ -212,10 +212,10 @@ def run3():
                              'test': torch.utils.data.DataLoader(Subset(rna_data, test_inds),
                                                                  batch_size=batch_size, shuffle=False)}
 
-    deeper_1d = {'n_init_features': [16,64,64,64],
+    deeper_1d = {'n_init_features': [64,128,128,128],
                  'n_hidden_channels': 64,
                  'drop_rate': 0.05,
-                 'n_blocks': 12,
+                 'n_blocks': 16,
                  'glu_act': True,
                  'n_in_channels': rna_data.n_node_dim,
                  'n_out_channels': rna_data.n_pred_dim}
@@ -223,10 +223,10 @@ def run3():
     #model = DenseDeep1D(**deeper_1d)
     model = Deep1D_incept(**deeper_1d)
 
-    opt_params = {'n_epochs': 40,
+    opt_params = {'n_epochs': 60,
                   'lr_init': 0.01,
-                  'scheduler_step_size': 10,
-                  'scheduler_gamma': 0.2,
+                  'scheduler_step_size': 15,
+                  'scheduler_gamma': 0.1,
                   'trainer_save': trainer_out_prefix}
     print_dict(opt_params, fout=f_params)
     f_params.flush()
@@ -265,13 +265,13 @@ def run4():
 
     deeper_1d = {'in_channels' : rna_data.n_node_dim,
                  'out_channels' : rna_data.n_pred_dim,
-                 'nblocks' : 24,
-                 'hidden_progression' : [64, 64, 64, 64,
-                                         64, 64, 64, 64,
-                                         128, 128, 128, 128,
-                                         128, 128, 128, 128,
+                 'nblocks' : 20,
+                 'p_dropout' : 0.10,
+                 'hidden_progression' : [256, 256, 256, 256,
                                          256, 256, 256, 256,
-                                         256, 256, 256, 256]}
+                                         512, 512, 512, 512,
+                                         512, 512, 512, 512,
+                                         1024, 1024, 1024, 1024]}
     print_dict(deeper_1d, fout=f_params)
     model = Res1D(**deeper_1d)
 
@@ -288,4 +288,4 @@ def run4():
 
     print ('Done!')
 
-run4()
+run3()

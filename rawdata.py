@@ -134,14 +134,16 @@ def _rna_bond(n1, n2):
 
 def _seq_dist_bin(d1, d2):
     dd = abs(d1 - d2)
-    if dd <= 6:
-        return [1.0,0.0,0.0,0.0]
-    elif dd >= 7 and dd <= 12:
-        return [0.0,1.0,0.0,0.0]
-    elif dd >=13 and dd <=18:
-        return [0.0,0.0,1.0,0.0]
+    if dd <= 3:
+        return [1.0,0.0,0.0,0.0,0.0]
+    elif dd >= 4 and dd <= 8:
+        return [0.0,1.0,0.0,0.0,0.0]
+    elif dd >=9 and dd <=13:
+        return [0.0,0.0,1.0,0.0,0.0]
+    elif dd >=14 and dd <=18:
+        return [0.0,0.0,0.0,1.0,0.0]
     else:
-        return [0.0,0.0,0.0,1.0]
+        return [0.0,0.0,0.0,0.0,1.0]
 
 def create_graph_matrix_bpp(id, seq):
 
@@ -161,12 +163,14 @@ def create_graph_matrix_bpp(id, seq):
             bond_vec[0] += bv[0]
             bond_vec[1] += bv[1]
             bond_vec[2] += bv[2]
-        seq_vec = [0.0, 0.0, 0.0, 0.0]
+#        seq_vec = []
+        seq_vec = [0.0, 0.0, 0.0, 0.0, 0.0]
         for sv in bond_dists:
             seq_vec[0] += sv[0]
             seq_vec[1] += sv[1]
             seq_vec[2] += sv[2]
             seq_vec[3] += sv[3]
+            seq_vec[4] += sv[4]
 
         feature_vecs.append(nuc_vec + bond_vec + seq_vec)
     return feature_vecs
